@@ -21,7 +21,6 @@ app.use(cookieParser());
 // --- Redis Database for Points and Locks ---
 let redis: Redis | null = null;
 
-/* Redis is temporarily disabled by request
 try {
   if (process.env.REDIS_URL) {
     redis = new Redis(process.env.REDIS_URL, {
@@ -55,8 +54,6 @@ try {
   console.error('Redis initialization failed:', error);
   redis = null;
 }
-*/
-console.log('Redis is temporarily disabled. Using in-memory storage.');
 
 // Fallback in-memory storage if Redis is not available
 const usersDbMem = new Map<string, any>();
