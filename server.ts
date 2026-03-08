@@ -20,10 +20,39 @@ app.use(express.json());
 app.use(cookieParser());
 
 // --- Redis Database for Points and Locks ---
-const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
+let redis: Redis | null = null;
 
-if (!redis) {
-  console.warn('REDIS_URL not found. Falling back to in-memory storage (data will be lost on restart).');
+try {
+  if (process.env.REDIS_URL) {
+    redis = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times) {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      reconnectOnError(err) {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) {
+          return true;
+        }
+        return false;
+      }
+    });
+
+    if (redis) {
+      redis.on('error', (err) => {
+        console.error('Redis connection error:', err);
+      });
+      redis.on('connect', () => {
+        console.log('Connected to Redis');
+      });
+    }
+  } else {
+    console.warn('REDIS_URL not found. Falling back to in-memory storage (data will be lost on restart).');
+  }
+} catch (error) {
+  console.error('Redis initialization failed:', error);
+  redis = null;
 }
 
 // Fallback in-memory storage if Redis is not available
@@ -138,8 +167,14 @@ const ADMIN_EMAILS = ['junmuncheng@gmail.com', 'junmunchenh@gmail.com'];
 // Initialize Google Drive JWT Client
 function getDriveClient(req?: express.Request) {
   const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  // Handle private key formatting (replace literal \n with actual newlines)
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  // Handle private key formatting (replace literal \n with actual newlines and remove surrounding quotes)
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  if (privateKey) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.substring(1, privateKey.length - 1);
+    }
+  }
 
   if (!clientEmail || !privateKey) {
     throw new Error('Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY in environment variables.');
@@ -715,6 +750,16 @@ app.post('/api/admin/folders', isAdmin, async (req, res) => {
 });
 
 // --------------------------------
+
+// Global error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error', 
+    message: err.message || 'An unexpected error occurred',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
 
 async function startServer() {
   // Vite middleware for development
