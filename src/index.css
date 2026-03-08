@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
+  
+  --color-my-blue: #012169;
+  --color-my-red: #CC0000;
+  --color-my-yellow: #FFCC00;
+  --color-my-white: #FFFFFF;
+  --color-my-ink: #0A1128;
+  --color-my-bg: #F0F0F0;
+}
+
+body {
+  background-color: var(--color-my-bg);
+  color: var(--color-my-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Premium Grid Row */
+.data-row {
+  display: grid;
+  grid-template-columns: 40px 40px 1fr 100px 80px 60px;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .data-row {
+    grid-template-columns: 40px 40px 1fr 60px;
+  }
+  .hide-mobile {
+    display: none;
+  }
+}
+
+/* Hide scrollbar */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(1, 33, 105, 0.15);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(1, 33, 105, 0.3);
+}
+
+/* Custom Checkbox */
+.custom-checkbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(10, 17, 40, 0.3);
+  border-radius: 0px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-checkbox:checked {
+  background-color: var(--color-my-yellow);
+  border-color: var(--color-my-yellow);
+}
+
+.custom-checkbox:checked::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-my-blue);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+.custom-checkbox:hover {
+  border-color: var(--color-my-blue);
+}
