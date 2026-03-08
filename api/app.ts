@@ -21,10 +21,12 @@ app.use(cookieParser());
 // --- Redis Database for Points and Locks ---
 let redis: Redis | null = null;
 
+/* Redis is temporarily disabled by request
 try {
   if (process.env.REDIS_URL) {
     redis = new Redis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 3,
+      maxRetriesPerRequest: null,
+      connectTimeout: 10000,
       retryStrategy(times) {
         const delay = Math.min(times * 50, 2000);
         return delay;
@@ -53,6 +55,8 @@ try {
   console.error('Redis initialization failed:', error);
   redis = null;
 }
+*/
+console.log('Redis is temporarily disabled. Using in-memory storage.');
 
 // Fallback in-memory storage if Redis is not available
 const usersDbMem = new Map<string, any>();
@@ -61,20 +65,30 @@ const unlockedFoldersDbMem = new Map<string, Set<string>>();
 
 async function getUser(email: string) {
   if (redis) {
-    const data = await redis.hgetall(`user:${email}`);
-    if (Object.keys(data).length === 0) return null;
-    return { ...data, points: parseInt(data.points || '0', 10) };
+    try {
+      const data = await redis.hgetall(`user:${email}`);
+      if (Object.keys(data).length === 0) return null;
+      return { ...data, points: parseInt(data.points || '0', 10) };
+    } catch (err) {
+      console.error('Redis getUser error:', err);
+      // Fallback to memory
+    }
   }
   return usersDbMem.get(email) || null;
 }
 
 async function saveUser(email: string, name: string, points: number) {
   if (redis) {
-    await redis.hset(`user:${email}`, { email, name, points: points.toString() });
-    await redis.sadd('user_emails', email);
-  } else {
-    usersDbMem.set(email, { email, name, points });
+    try {
+      await redis.hset(`user:${email}`, { email, name, points: points.toString() });
+      await redis.sadd('user_emails', email);
+      return;
+    } catch (err) {
+      console.error('Redis saveUser error:', err);
+      // Fallback to memory
+    }
   }
+  usersDbMem.set(email, { email, name, points });
 }
 
 async function ensureUser(email: string, name: string) {
@@ -86,78 +100,106 @@ async function ensureUser(email: string, name: string) {
 
 async function getLockedFolders() {
   if (redis) {
-    const data = await redis.hgetall('locked_folders');
-    const folders: { id: string, cost: number }[] = [];
-    for (const [id, cost] of Object.entries(data)) {
-      folders.push({ id, cost: parseInt(cost, 10) });
+    try {
+      const data = await redis.hgetall('locked_folders');
+      const folders: { id: string, cost: number }[] = [];
+      for (const [id, cost] of Object.entries(data)) {
+        folders.push({ id, cost: parseInt(cost, 10) });
+      }
+      return folders;
+    } catch (err) {
+      console.error('Redis getLockedFolders error:', err);
     }
-    return folders;
   }
   return Array.from(lockedFoldersConfigMem.entries()).map(([id, cost]) => ({ id, cost }));
 }
 
 async function getFolderCost(folderId: string) {
   if (redis) {
-    const cost = await redis.hget('locked_folders', folderId);
-    return cost ? parseInt(cost, 10) : null;
+    try {
+      const cost = await redis.hget('locked_folders', folderId);
+      return cost ? parseInt(cost, 10) : null;
+    } catch (err) {
+      console.error('Redis getFolderCost error:', err);
+    }
   }
   return lockedFoldersConfigMem.get(folderId) ?? null;
 }
 
 async function setFolderLock(folderId: string, cost: number | null) {
   if (redis) {
-    if (cost === null) {
-      await redis.hdel('locked_folders', folderId);
-    } else {
-      await redis.hset('locked_folders', folderId, cost.toString());
+    try {
+      if (cost === null) {
+        await redis.hdel('locked_folders', folderId);
+      } else {
+        await redis.hset('locked_folders', folderId, cost.toString());
+      }
+      return;
+    } catch (err) {
+      console.error('Redis setFolderLock error:', err);
     }
+  }
+  if (cost === null) {
+    lockedFoldersConfigMem.delete(folderId);
   } else {
-    if (cost === null) {
-      lockedFoldersConfigMem.delete(folderId);
-    } else {
-      lockedFoldersConfigMem.set(folderId, cost);
-    }
+    lockedFoldersConfigMem.set(folderId, cost);
   }
 }
 
 async function isFolderUnlocked(email: string, folderId: string) {
   if (redis) {
-    return await redis.sismember(`unlocked:${email}`, folderId) === 1;
+    try {
+      return await redis.sismember(`unlocked:${email}`, folderId) === 1;
+    } catch (err) {
+      console.error('Redis isFolderUnlocked error:', err);
+    }
   }
   return unlockedFoldersDbMem.get(email)?.has(folderId) || false;
 }
 
 async function unlockFolder(email: string, folderId: string) {
   if (redis) {
-    await redis.sadd(`unlocked:${email}`, folderId);
-  } else {
-    if (!unlockedFoldersDbMem.has(email)) unlockedFoldersDbMem.set(email, new Set());
-    unlockedFoldersDbMem.get(email)?.add(folderId);
+    try {
+      await redis.sadd(`unlocked:${email}`, folderId);
+      return;
+    } catch (err) {
+      console.error('Redis unlockFolder error:', err);
+    }
   }
+  if (!unlockedFoldersDbMem.has(email)) unlockedFoldersDbMem.set(email, new Set());
+  unlockedFoldersDbMem.get(email)?.add(folderId);
 }
 
 async function getAllUsers() {
   if (redis) {
-    const emails = await redis.smembers('user_emails');
-    const users = [];
-    for (const email of emails) {
-      const user = await getUser(email);
-      if (user) users.push(user);
+    try {
+      const emails = await redis.smembers('user_emails');
+      const users = [];
+      for (const email of emails) {
+        const user = await getUser(email);
+        if (user) users.push(user);
+      }
+      return users;
+    } catch (err) {
+      console.error('Redis getAllUsers error:', err);
     }
-    return users;
   }
   return Array.from(usersDbMem.values());
 }
 
 async function deleteUser(email: string) {
   if (redis) {
-    await redis.del(`user:${email}`);
-    await redis.del(`unlocked:${email}`);
-    await redis.srem('user_emails', email);
-  } else {
-    usersDbMem.delete(email);
-    unlockedFoldersDbMem.delete(email);
+    try {
+      await redis.del(`user:${email}`);
+      await redis.del(`unlocked:${email}`);
+      await redis.srem('user_emails', email);
+      return;
+    } catch (err) {
+      console.error('Redis deleteUser error:', err);
+    }
   }
+  usersDbMem.delete(email);
+  unlockedFoldersDbMem.delete(email);
 }
 
 const ADMIN_EMAILS = ['junmuncheng@gmail.com', 'junmunchenh@gmail.com'];
