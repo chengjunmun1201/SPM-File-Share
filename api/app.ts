@@ -199,7 +199,7 @@ async function deleteUser(email: string) {
   unlockedFoldersDbMem.delete(email);
 }
 
-const ADMIN_EMAILS = ['junmuncheng@gmail.com', 'junmunchenh@gmail.com'];
+const ADMIN_EMAILS = ['junmunchenh@gmail.com'];
 // -----------------------------------------------
 
 // Initialize Google Drive JWT Client
@@ -237,7 +237,7 @@ app.get('/api/auth/url', (req, res) => {
     client_id: process.env.OAUTH_CLIENT_ID || '',
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.readonly',
+    scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
     access_type: 'offline',
     prompt: 'consent',
     state: redirectUri

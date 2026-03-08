@@ -1,5 +1,5 @@
 {
-  "name": "Remix: Remix: Remix: Remix: Google Drive Explorer",
-  "description": "An app to view, search, and download files from Google Drive.",
+  "name": "Google Drive Archive Explorer",
+  "description": "A secure portal to view and download files from a shared Google Drive archive.",
   "requestFramePermissions": []
 }
